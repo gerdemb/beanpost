@@ -413,7 +413,9 @@ CREATE TABLE public.posting (
     flag character(1),
     amount public.amount NOT NULL,
     price public.amount,
-    cost public.amount
+    cost public.amount,
+    cost_date date,
+    cost_label text
 );
 
 

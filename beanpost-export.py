@@ -58,6 +58,8 @@ SELECT
 	posting.date,
 	posting.amount,
 	posting.cost,
+	posting.cost_date,
+	posting.cost_label,
 	posting.price,
 	account.name
 FROM
@@ -84,12 +86,18 @@ ORDER BY
         account = row["name"]
         number, currency = parse_amount(row["amount"])
         amount = f"{number} {currency}"
+        if cost := row["cost"]:
+            number, currency = parse_amount(cost)
+            cost_date = row["cost_date"]
+            cost_label = row["cost_label"]
+            if cost_label:
+                amount += f' {{{cost_date}, {number} {currency}, "{cost_label}"}}'
+            else:
+                amount += f" {{{cost_date}, {number} {currency}}}"
         if price := row["price"]:
             number, currency = parse_amount(price)
             amount += f" @ {number} {currency}"
-        if cost := row["cost"]:
-            number, currency = parse_amount(cost)
-            amount += f" {{{number} {currency}}}"
+
         file.write(f"  {account} {amount}\n")
 
 

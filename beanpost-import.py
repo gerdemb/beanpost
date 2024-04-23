@@ -86,10 +86,22 @@ def import_transactions(cursor, entries):
             for posting in entry.postings:
                 amount = get_amount(posting.units)
                 cost = get_amount(posting.cost)
+                cost_date = posting.cost.date if cost else None
+                cost_label = posting.cost.label if cost else None
                 price = get_amount(posting.price)
                 account_id = account_map[posting.account]
                 posting_values.append(
-                    (entry.date, account_id, eid, posting.flag, amount, price, cost)
+                    (
+                        entry.date,
+                        account_id,
+                        eid,
+                        posting.flag,
+                        amount,
+                        price,
+                        cost,
+                        cost_date,
+                        cost_label,
+                    )
                 )
 
     execute_batch(
@@ -103,8 +115,8 @@ def import_transactions(cursor, entries):
     execute_batch(
         cursor,
         """
-        INSERT INTO posting (date, account_id, transaction_id, flag, amount, price, cost)
-        VALUES (%s, %s, %s, %s, %s, %s, %s);
+        INSERT INTO posting (date, account_id, transaction_id, flag, amount, price, cost, cost_date, cost_label)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
                   """,
         posting_values,
     )
