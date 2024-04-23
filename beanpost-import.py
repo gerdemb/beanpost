@@ -122,6 +122,38 @@ def import_transactions(cursor, entries):
     )
 
 
+def match_lots(cursor, entries):
+    cursor.execute(
+        """
+WITH augmentations AS (
+	-- Select rows with positive amount.number
+	SELECT
+		*
+	FROM
+		posting
+	WHERE (amount).number > 0)
+UPDATE
+	posting
+SET
+	matching_lot_id = (
+		SELECT
+			id
+		FROM
+			augmentations
+		WHERE
+			-- Matching by cost number, cost date, or cost label
+			(augmentations.cost = posting.cost
+				OR augmentations.cost_date = posting.cost_date
+				OR augmentations.cost_label = posting.cost_label)
+			AND augmentations.id != posting.id
+		LIMIT 1)
+WHERE (amount).number < 0;
+
+SELECT * FROM posting;
+"""
+    )
+
+
 def import_balances(cursor, entries):
     balance_values = []
 
@@ -278,6 +310,7 @@ def main():
         truncate,
         import_accounts,
         import_transactions,
+        match_lots,
         import_balances,
         import_prices,
         import_commodities,
