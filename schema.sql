@@ -241,6 +241,40 @@ $$;
 
 
 --
+-- Name: cost_basis_avg(public.lot[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.cost_basis_avg(lots public.lot[]) RETURNS public.lot
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    total_cost NUMERIC := 0;
+    total_amount NUMERIC := 0;
+    i INT;
+    average_cost NUMERIC;
+    result_lot lot;
+    currency text;
+BEGIN
+	currency := (lots[1].amount).currency;
+	
+    FOR i IN 1..array_length(lots, 1)
+    LOOP
+        total_cost := total_cost + (lots[i].cost).number * (lots[i].amount).number;
+        total_amount := total_amount + (lots[i].amount).number;
+    END LOOP;
+
+    -- Calculate the average cost per unit
+    average_cost := total_cost / total_amount;
+
+    -- Create the resulting lot with the average cost
+    result_lot := ((total_amount, currency)::amount, (average_cost, currency)::amount, NULL, NULL);
+
+    RETURN result_lot;
+END;
+$$;
+
+
+--
 -- Name: is_balanced(public.amount[], public.amount[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
