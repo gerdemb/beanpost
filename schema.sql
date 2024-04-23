@@ -40,6 +40,18 @@ CREATE TYPE public.amount AS (
 );
 
 
+--
+-- Name: lot; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.lot AS (
+	amount public.amount,
+	cost public.amount,
+	date date,
+	label text
+);
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -420,13 +432,6 @@ CREATE TABLE public.posting (
 
 
 --
--- Name: COLUMN posting.account_id; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.posting.account_id IS '@notNull';
-
-
---
 -- Name: posting_balance(public.posting); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -558,6 +563,45 @@ END IF;
 
 RETURN state;
 
+END;
+$$;
+
+
+--
+-- Name: sum(public.lot[], public.posting); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.sum(state public.lot[], current public.posting) RETURNS public.lot[]
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	-- Temporary variable to hold the lot constructed from the current posting.
+	new_lot lot;
+	i int = 0;
+BEGIN
+	-- Constructing a new lot type from current posting.
+	new_lot := (current.amount,
+		current.cost,
+		current.cost_date,
+		current.cost_label);
+	-- Check if the state is NULL (first call) and initialize if necessary.
+	IF array_length(state, 1) IS NULL THEN
+		RETURN array_append(state, new_lot);
+	END IF;
+	-- If there is a cost, append the new lot to the state array.
+	IF current.cost IS NOT NULL THEN
+		RETURN array_append(state, new_lot);
+	END IF;
+	-- Treat as an amount without cost, attempt to merge with existing lots.
+	FOR i IN 1..array_length(state, 1)
+	LOOP
+		IF (state[i].amount).currency = (current.amount).currency AND state[i].
+	COST IS NULL THEN
+			state[i].amount.number := (state[i].amount).number + (current.amount).number;
+			RETURN state;
+		END IF;
+	END LOOP;
+	RETURN array_append(state, new_lot);
 END;
 $$;
 
@@ -750,6 +794,17 @@ CREATE AGGREGATE public.sum(public.amount[]) (
 CREATE AGGREGATE public.sum(public.amount) (
     SFUNC = public.sum,
     STYPE = public.amount[],
+    INITCOND = '{}'
+);
+
+
+--
+-- Name: sum(public.posting); Type: AGGREGATE; Schema: public; Owner: -
+--
+
+CREATE AGGREGATE public.sum(public.posting) (
+    SFUNC = public.sum,
+    STYPE = public.lot[],
     INITCOND = '{}'
 );
 
