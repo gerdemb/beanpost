@@ -49,7 +49,8 @@ CREATE TYPE public.lot AS (
 	amount public.amount,
 	cost public.amount,
 	date date,
-	label text
+	label text,
+	matching_lot_id integer
 );
 
 
@@ -242,30 +243,82 @@ $$;
 
 
 --
+-- Name: posting; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.posting (
+    id integer NOT NULL,
+    date date NOT NULL,
+    account_id integer NOT NULL,
+    transaction_id integer NOT NULL,
+    flag character(1),
+    amount public.amount NOT NULL,
+    price public.amount,
+    cost public.amount,
+    cost_date date,
+    cost_label text,
+    matching_lot_id integer
+);
+
+
+--
+-- Name: cost_basis(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.cost_basis(postings public.posting[]) RETURNS SETOF public.lot
+    LANGUAGE sql
+    AS $$
+WITH
+augmentation AS (
+	SELECT 
+		posting.id,	posting.amount,	posting.cost, posting.cost_date, posting.cost_label, sum(matching_lot.amount) AS sum
+	FROM
+		UNNEST(postings) AS posting
+		LEFT JOIN UNNEST(postings) AS matching_lot ON matching_lot.matching_lot_id = posting.id
+	WHERE
+		(posting.amount).number > 0
+	GROUP BY
+		posting.id, posting.amount, posting.cost, posting.cost_date, posting.cost_label
+
+)
+SELECT
+	augmentation.id,
+    (sum(augmentation.sum, augmentation.amount))[1],
+	augmentation.cost,
+	augmentation.cost_date,
+	augmentation.cost_label,
+	NULL::INTEGER
+FROM
+	augmentation
+$$;
+
+
+--
 -- Name: cost_basis_avg(public.lot[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
 CREATE FUNCTION public.cost_basis_avg(lots public.lot[]) RETURNS public.lot
     LANGUAGE sql
     AS $$
-WITH summed AS (
-    -- Sum the total cost and total amount
-    SELECT
-        SUM((lot.cost).number * (lot.amount).number) AS total_cost,
-        SUM((lot.amount).number) AS total_amount,
-        MIN((lot.amount).currency) AS currency
-    FROM
-        UNNEST(lots) AS lot
+	WITH summed AS (
+		-- Sum the total cost and total amount
+		SELECT
+			sum((lot.cost).number * (lot.amount).number) AS total_cost,
+			sum((lot.amount).number) AS total_amount,
+			min((lot.amount).currency) AS currency
+		FROM
+			unnest(lots) AS lot
 )
-
-SELECT
-    NULL::INTEGER,  -- Corresponds to the id in the lot
-    (total_amount, currency)::amount,  -- Total amount
-    (total_cost / total_amount, currency)::amount,  -- Average cost
-    NULL::DATE,  -- Corresponds to `cost_date`
-    NULL::TEXT   -- Corresponds to `cost_label`
+	SELECT
+		NULL::integer, -- Corresponds to the id in the lot
+		(total_amount, currency)::amount, -- Total amount
+	(total_cost / total_amount, currency)::amount, -- Average cost
+	NULL::date, -- Corresponds to `cost_date`
+	NULL::text, -- Corresponds to `cost_label`
+	NULL::integer -- Corresponds to `matching_lot_id`
 FROM
-    summed;
+	summed;
+
 $$;
 
 
@@ -443,25 +496,6 @@ $$;
 
 
 --
--- Name: posting; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.posting (
-    id integer NOT NULL,
-    date date NOT NULL,
-    account_id integer NOT NULL,
-    transaction_id integer NOT NULL,
-    flag character(1),
-    amount public.amount NOT NULL,
-    price public.amount,
-    cost public.amount,
-    cost_date date,
-    cost_label text,
-    matching_lot_id integer
-);
-
-
---
 -- Name: posting_balance(public.posting); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -562,37 +596,20 @@ $$;
 CREATE FUNCTION public.sum(state public.amount[], current public.amount) RETURNS public.amount[]
     LANGUAGE plpgsql
     AS $$
-DECLARE found boolean = FALSE;
-
-i int = 0;
-
+DECLARE
+	i int;
 BEGIN
-	IF array_length(state,
-		1) IS NULL THEN
-		RETURN ARRAY[CURRENT];
-
-END IF;
-
-FOR i IN 1..array_length(state, 1)
-LOOP
-	IF state[i].currency = current.currency THEN
-		state[i].number := state[i].number + current.number;
-
-found := TRUE;
-
-EXIT;
-
-END IF;
-
-END LOOP;
-
-IF NOT found THEN
-	state := array_append(state, CURRENT);
-
-END IF;
-
-RETURN state;
-
+	IF CURRENT IS NULL THEN
+		RETURN state;
+	END IF;
+	FOR i IN 1..coalesce(array_length(state, 1), 0)
+	LOOP
+		IF state[i].currency = current.currency THEN
+			state[i].number := state[i].number + current.number;
+			RETURN state;
+		END IF;
+	END LOOP;
+	RETURN array_append(state, CURRENT);
 END;
 $$;
 
@@ -610,10 +627,12 @@ DECLARE
 	i int = 0;
 BEGIN
 	-- Constructing a new lot type from current posting.
-	new_lot := (current.id, current.amount,
+	new_lot := (current.id,
+		current.amount,
 		current.cost,
 		current.cost_date,
-		current.cost_label);
+		current.cost_label,
+		current.matching_lot_id);
 	-- Check if the state is NULL (first call) and initialize if necessary.
 	IF array_length(state, 1) IS NULL THEN
 		RETURN array_append(state, new_lot);
