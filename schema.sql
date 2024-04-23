@@ -45,6 +45,7 @@ CREATE TYPE public.amount AS (
 --
 
 CREATE TYPE public.lot AS (
+	id integer,
 	amount public.amount,
 	cost public.amount,
 	date date,
@@ -245,32 +246,26 @@ $$;
 --
 
 CREATE FUNCTION public.cost_basis_avg(lots public.lot[]) RETURNS public.lot
-    LANGUAGE plpgsql
+    LANGUAGE sql
     AS $$
-DECLARE
-    total_cost NUMERIC := 0;
-    total_amount NUMERIC := 0;
-    i INT;
-    average_cost NUMERIC;
-    result_lot lot;
-    currency text;
-BEGIN
-	currency := (lots[1].amount).currency;
-	
-    FOR i IN 1..array_length(lots, 1)
-    LOOP
-        total_cost := total_cost + (lots[i].cost).number * (lots[i].amount).number;
-        total_amount := total_amount + (lots[i].amount).number;
-    END LOOP;
+WITH summed AS (
+    -- Sum the total cost and total amount
+    SELECT
+        SUM((lot.cost).number * (lot.amount).number) AS total_cost,
+        SUM((lot.amount).number) AS total_amount,
+        MIN((lot.amount).currency) AS currency
+    FROM
+        UNNEST(lots) AS lot
+)
 
-    -- Calculate the average cost per unit
-    average_cost := total_cost / total_amount;
-
-    -- Create the resulting lot with the average cost
-    result_lot := ((total_amount, currency)::amount, (average_cost, currency)::amount, NULL, NULL);
-
-    RETURN result_lot;
-END;
+SELECT
+    NULL::INTEGER,  -- Corresponds to the id in the lot
+    (total_amount, currency)::amount,  -- Total amount
+    (total_cost / total_amount, currency)::amount,  -- Average cost
+    NULL::DATE,  -- Corresponds to `cost_date`
+    NULL::TEXT   -- Corresponds to `cost_label`
+FROM
+    summed;
 $$;
 
 
@@ -461,7 +456,8 @@ CREATE TABLE public.posting (
     price public.amount,
     cost public.amount,
     cost_date date,
-    cost_label text
+    cost_label text,
+    matching_lot_id integer
 );
 
 
@@ -614,7 +610,7 @@ DECLARE
 	i int = 0;
 BEGIN
 	-- Constructing a new lot type from current posting.
-	new_lot := (current.amount,
+	new_lot := (current.id, current.amount,
 		current.cost,
 		current.cost_date,
 		current.cost_label);
@@ -1104,6 +1100,14 @@ ALTER TABLE ONLY public.document
 
 ALTER TABLE ONLY public.posting
     ADD CONSTRAINT posting_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.account(id);
+
+
+--
+-- Name: posting posting_matching_lot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.posting
+    ADD CONSTRAINT posting_matching_lot_id_fkey FOREIGN KEY (matching_lot_id) REFERENCES public.posting(id);
 
 
 --
