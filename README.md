@@ -141,14 +141,27 @@ FROM
 	transaction;
 ```
 
+- Calculate cost basis
+
+```
+SELECT
+	inventory (posting.*) as none,
+	cost_basis (posting.*) as strict,
+	cost_basis_avg(posting.*) as average
+FROM
+	posting;
+```
+
 ## What's Missing?
 
-Although beanpost is comprehensive, some features are currently missing:
+Although beanpost is fairly comprehensive, some features are currently missing:
 
-- _Cost Basis_: No functions for cost-basis calculations. This could be added with a PostgreSQL function.
 - _Not all beancount directives are imported_: While the common directives are supported, some obscure ones like `Notes` and `Events` aren't. These could be added easily.
-- _Closed accounts_: There is no check for transactions occurring after an account has been closed. This should be straightforward to add.
-- _Account currencies_: No validation to ensure transactions align with specified account currencies.
+- _Validation_: should be straightforward to add most of these.
+  1.  Check for transactions occurring after an account has been closed
+  2.  Check that transactions match with specified account currencies
+  3.  Check that inventory reductions have the same currency as the augmentation (lot) they are reducing from
+  4.  Check that inventory reductions don't reduce lot amounts below zero
 - _Plugins_
 - _Importing statements_
 
@@ -159,9 +172,10 @@ Although beanpost is comprehensive, some features are currently missing:
 - _Tolerances_: Defined explicitly in the commodity table, not derived automatically.
 - _Documents_: Stored as byte data inside the database, with support for import and export.
 - _Balance directive name_: Beancount `Balance` directives are stored in the assertion table for clarity.
+- _Lot matching_: The logic for matching lots for cost basis has not been tested thoroughly and may not match lots in the exact same way as beancount does.
 
 ## Conclusions
 
-Implementing most of beancount's functionality with PostgreSQL was surprisingly straightforward. While some features are missing, adding them shouldn't be a major challenge. The main advantage of PostgreSQL is the ability to easily query and manipulate data, which can sometimes be difficult with simple text files. However, simple text files have the benefit of being more accessible and user-friendly, suggesting that a front-end might be required to make this database more accessible.
+Implementing most of beancount's core functionality with PostgreSQL was surprisingly straightforward. While some features are missing, adding them shouldn't be a major challenge. The main advantage of PostgreSQL is the ability to easily query and manipulate data, which can sometimes be difficult with simple text files. However, simple text files have the benefit of being more accessible and user-friendly, a front-end will be required to make this a truely useful project.
 
 I have tested this with a personal beancount file containing about 10,000 entries, spanning four years, with transactions in multiple currencies and various accounts. So far, I haven't found any discrepancies between the original beancount file and the exported data from beanpost. I'd love to hear about your experiences with beanpost—please drop me a line!
