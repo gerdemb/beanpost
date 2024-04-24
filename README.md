@@ -47,7 +47,7 @@ CREATE TYPE amount AS (
 );
 ```
 
-This custom type enables PostgreSQL functions like `sum(amount[], amount)`, allowing us to create balances with queries like `SELECT sum(amount) FROM POSTING`. Using this amount type as a foundation, we build other useful functions as described below.
+This custom type enables PostgreSQL functions like `sum(amount)`, allowing us to create balances (baskets of currencies) with queries like `SELECT sum(amount) FROM POSTING`. Using this amount type as a foundation, we build other useful functions as described below.
 
 ## What Can I Do with This?
 
@@ -156,20 +156,23 @@ FROM
 
 Although beanpost is fairly comprehensive, some features are currently missing:
 
-- _Not all beancount directives are imported_: While the common directives are supported, some obscure ones like `Notes` and `Events` aren't. These could be added easily.
+- _Some beancount data types are not imported_: While the common directives are supported, some more obscure feature aren't. These could likely be added easily.
+  1. `Notes` and `Events` directives
+  2. Flags on postings
 - _Validation_: should be straightforward to add most of these.
   1.  Check for transactions occurring after an account has been closed
   2.  Check that transactions match with specified account currencies
   3.  Check that inventory reductions have the same currency as the augmentation (lot) they are reducing from
   4.  Check that inventory reductions don't reduce lot amounts below zero
+  5.  For strict cost-basis, all reductions should have matching augmentation lots
 - _Plugins_
-- _Importing statements_
+- _Importing statements_: This might be out of scope for this project. Since the data is stored in a PostgreSQL database, any client that can insert data into the database could be written in any language.
 
 ## What is Different from beancount?
 
 - _Transaction dates_: Each posting can have its own date, allowing transactions to balance even if individual postings have different dates. This helps with common issues when transferring money between accounts where withdrawal and deposit dates differ.
 - _Pad directives_: Converted to regular Transaction directives with a fixed amount instead of "padded" adjustable amounts.
-- _Tolerances_: Defined explicitly in the commodity table, not derived automatically.
+- _Tolerances_: Decimal places for commodities are defined explicitly in the commodity table decimal_places column, not derived automatically like in beancount. Tolerances are calculated as if the option `infer_tolerance_from_cost` is true.
 - _Documents_: Stored as byte data inside the database, with support for import and export.
 - _Balance directive name_: Beancount `Balance` directives are stored in the assertion table for clarity.
 - _Lot matching_: The logic for matching lots for cost basis has not been tested thoroughly and may not match lots in the exact same way as beancount does.
