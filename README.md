@@ -145,9 +145,11 @@ FROM
 
 ```
 SELECT
-	inventory (posting.*) as none,
-	cost_basis (posting.*) as strict,
-	cost_basis_avg(posting.*) as average
+	inventory (posting.*) AS none,
+	cost_basis (posting.*) AS strict,
+	cost_basis_avg (posting.*) AS avg,
+	cost_basis_fifo (posting.*) AS fifo,
+	cost_basis_lifo (posting.*) AS lifo
 FROM
 	posting;
 ```
