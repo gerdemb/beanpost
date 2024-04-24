@@ -326,6 +326,49 @@ $$;
 
 
 --
+-- Name: cost_basis_fifo(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.cost_basis_fifo(postings public.posting[]) RETURNS public.lot[]
+    LANGUAGE sql
+    AS $$
+	WITH reduction AS (
+		SELECT
+			(amount).currency AS currency,
+			sum((amount).number) AS number
+		FROM
+			unnest(postings) AS posting
+		WHERE (amount).number < 0
+		AND
+		COST IS NOT NULL
+	GROUP BY
+		(amount).currency
+),
+adjusted_postings AS (
+	SELECT
+		posting.*,
+		reduction.*,
+		(sum((amount).number) OVER (PARTITION BY (posting.amount).currency ORDER BY date)) + coalesce(reduction.number, 0) AS adjusted_amount
+FROM
+	unnest(postings) AS posting
+	LEFT JOIN reduction ON reduction.currency = (posting.amount).currency
+	WHERE
+		posting.cost IS NOT NULL
+		AND (posting.amount).number > 0
+)
+SELECT
+	array_agg(ROW (id,
+			-- CASE statement to calculate new_column based on conditions
+			(least ((adjusted_postings.amount).number, adjusted_amount), (adjusted_postings.amount).currency)::amount,
+		COST, cost_date, cost_label)::lot)
+FROM
+	adjusted_postings
+WHERE
+	adjusted_amount > 0
+$$;
+
+
+--
 -- Name: inventory(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -873,6 +916,18 @@ CREATE AGGREGATE public.cost_basis_avg(public.posting) (
     STYPE = public.posting[],
     INITCOND = '{}',
     FINALFUNC = public.cost_basis_avg
+);
+
+
+--
+-- Name: cost_basis_fifo(public.posting); Type: AGGREGATE; Schema: public; Owner: -
+--
+
+CREATE AGGREGATE public.cost_basis_fifo(public.posting) (
+    SFUNC = array_append,
+    STYPE = public.posting[],
+    INITCOND = '{}',
+    FINALFUNC = public.cost_basis_fifo
 );
 
 
