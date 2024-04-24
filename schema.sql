@@ -49,8 +49,7 @@ CREATE TYPE public.lot AS (
 	amount public.amount,
 	cost public.amount,
 	date date,
-	label text,
-	matching_lot_id integer
+	label text
 );
 
 
@@ -265,60 +264,88 @@ CREATE TABLE public.posting (
 -- Name: cost_basis(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.cost_basis(postings public.posting[]) RETURNS SETOF public.lot
+CREATE FUNCTION public.cost_basis(postings public.posting[]) RETURNS public.lot[]
     LANGUAGE sql
     AS $$
-WITH
-augmentation AS (
-	SELECT 
-		posting.id,	posting.amount,	posting.cost, posting.cost_date, posting.cost_label, sum(matching_lot.amount) AS sum
-	FROM
-		UNNEST(postings) AS posting
-		LEFT JOIN UNNEST(postings) AS matching_lot ON matching_lot.matching_lot_id = posting.id
-	WHERE
-		(posting.amount).number > 0
-	GROUP BY
-		posting.id, posting.amount, posting.cost, posting.cost_date, posting.cost_label
-
+	WITH augmentation AS (
+		SELECT
+			posting.id,
+			posting.amount,
+			posting.cost,
+			posting.cost_date,
+			posting.cost_label,
+			(sum(matching_lot.amount))[1] AS reduction --matching_lost must have same currency
+		FROM
+			unnest(postings) AS posting
+		LEFT JOIN unnest(postings) AS matching_lot ON matching_lot.matching_lot_id = posting.id
+	WHERE (posting.amount).number > 0
+	AND posting.cost IS NOT NULL
+GROUP BY
+	posting.id,
+	posting.amount,
+	posting.cost,
+	posting.cost_date,
+	posting.cost_label
 )
 SELECT
-	augmentation.id,
-    (sum(augmentation.sum, augmentation.amount))[1],
-	augmentation.cost,
-	augmentation.cost_date,
-	augmentation.cost_label,
-	NULL::INTEGER
+	array_agg(ROW(augmentation.id, ((augmentation.amount).number + coalesce((augmentation.reduction).number, 0), (augmentation.amount).currency)::amount, augmentation.cost, augmentation.cost_date, augmentation.cost_label)::lot)
 FROM
 	augmentation
 $$;
 
 
 --
--- Name: cost_basis_avg(public.lot[]); Type: FUNCTION; Schema: public; Owner: -
+-- Name: cost_basis_avg(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.cost_basis_avg(lots public.lot[]) RETURNS public.lot
+CREATE FUNCTION public.cost_basis_avg(postings public.posting[]) RETURNS public.lot[]
     LANGUAGE sql
     AS $$
 	WITH summed AS (
 		-- Sum the total cost and total amount
 		SELECT
-			sum((lot.cost).number * (lot.amount).number) AS total_cost,
-			sum((lot.amount).number) AS total_amount,
-			min((lot.amount).currency) AS currency
+			sum((posting.cost).number * (posting.amount).number) AS total_cost,
+			sum((posting.amount).number) AS total_amount,
+			min((posting.amount).currency) AS currency
 		FROM
-			unnest(lots) AS lot
+			unnest(postings) AS posting
+		WHERE
+			posting.cost IS NOT NULL
+		GROUP BY
+			(posting.amount).currency
 )
 	SELECT
-		NULL::integer, -- Corresponds to the id in the lot
-		(total_amount, currency)::amount, -- Total amount
-	(total_cost / total_amount, currency)::amount, -- Average cost
-	NULL::date, -- Corresponds to `cost_date`
-	NULL::text, -- Corresponds to `cost_label`
-	NULL::integer -- Corresponds to `matching_lot_id`
-FROM
-	summed;
+		array_agg(ROW (NULL::integer, -- Corresponds to the id in the lot
+				(total_amount, currency)::amount, -- Total amount
+				(total_cost / total_amount, currency)::amount, -- Average cost
+				NULL::date, -- Corresponds to `cost_date`
+				NULL::text)::lot) -- Corresponds to `cost_label`
+	FROM
+		summed
+$$;
 
+
+--
+-- Name: inventory(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.inventory(postings public.posting[]) RETURNS public.lot[]
+    LANGUAGE sql
+    AS $$
+SELECT
+    ARRAY_AGG(
+        ROW(
+            posting.id,
+            posting.amount,
+            posting.cost,
+            posting.cost_date,
+            posting.cost_label
+        )::lot  -- Convert the row to a `lot` type
+    )
+FROM
+    UNNEST(postings) AS posting  -- Unnest the postings array
+WHERE
+    posting.cost IS NOT NULL;  -- Filter rows with non-null cost
 $$;
 
 
@@ -823,6 +850,42 @@ FROM
 WHERE
 	posting.transaction_id = t.id
 $$;
+
+
+--
+-- Name: cost_basis(public.posting); Type: AGGREGATE; Schema: public; Owner: -
+--
+
+CREATE AGGREGATE public.cost_basis(public.posting) (
+    SFUNC = array_append,
+    STYPE = public.posting[],
+    INITCOND = '{}',
+    FINALFUNC = public.cost_basis
+);
+
+
+--
+-- Name: cost_basis_avg(public.posting); Type: AGGREGATE; Schema: public; Owner: -
+--
+
+CREATE AGGREGATE public.cost_basis_avg(public.posting) (
+    SFUNC = array_append,
+    STYPE = public.posting[],
+    INITCOND = '{}',
+    FINALFUNC = public.cost_basis_avg
+);
+
+
+--
+-- Name: inventory(public.posting); Type: AGGREGATE; Schema: public; Owner: -
+--
+
+CREATE AGGREGATE public.inventory(public.posting) (
+    SFUNC = array_append,
+    STYPE = public.posting[],
+    INITCOND = '{}',
+    FINALFUNC = public.inventory
+);
 
 
 --
