@@ -72,6 +72,13 @@ CREATE TABLE public.account (
 
 
 --
+-- Name: TABLE account; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.account IS 'Combines beancount open and close directives';
+
+
+--
 -- Name: account_change(public.account, daterange); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -89,10 +96,17 @@ $$;
 
 
 --
--- Name: count_colon(text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: FUNCTION account_change(account public.account, range daterange); Type: COMMENT; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.count_colon(a text) RETURNS integer
+COMMENT ON FUNCTION public.account_change(account public.account, range daterange) IS 'Calculates the total amount of postings for a given account within a specified date range';
+
+
+--
+-- Name: depth(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.depth(a text) RETURNS integer
     LANGUAGE plpgsql IMMUTABLE
     AS $$
 BEGIN
@@ -103,10 +117,17 @@ $$;
 
 
 --
--- Name: trim_colon(text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: FUNCTION depth(a text); Type: COMMENT; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.trim_colon(s text) RETURNS text
+COMMENT ON FUNCTION public.depth(a text) IS 'Find depth of an account name by counting colons';
+
+
+--
+-- Name: reduce_depth(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.reduce_depth(s text) RETURNS text
     LANGUAGE plpgsql IMMUTABLE
     AS $$
 
@@ -130,19 +151,26 @@ $$;
 
 
 --
+-- Name: FUNCTION reduce_depth(s text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.reduce_depth(s text) IS 'Reduce depth of an account name by dropping last part of hierarchy';
+
+
+--
 -- Name: account_hierarchy; Type: VIEW; Schema: public; Owner: -
 --
 
 CREATE VIEW public.account_hierarchy AS
  WITH RECURSIVE names AS (
          SELECT account.name,
-            public.count_colon(account.name) AS depth
+            public.depth(account.name) AS depth
            FROM public.account
         UNION ALL
-         SELECT public.trim_colon(names_1.name) AS name,
-            public.count_colon(names_1.name) AS depth
+         SELECT public.reduce_depth(names_1.name) AS name,
+            public.depth(names_1.name) AS depth
            FROM names names_1
-          WHERE (public.count_colon(names_1.name) > 0)
+          WHERE (public.depth(names_1.name) > 0)
         )
  SELECT DISTINCT name,
     depth
@@ -154,7 +182,7 @@ CREATE VIEW public.account_hierarchy AS
 -- Name: VIEW account_hierarchy; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.account_hierarchy IS '@primaryKey name';
+COMMENT ON VIEW public.account_hierarchy IS 'Returns all hierarchial account names and their depth level';
 
 
 --
@@ -176,6 +204,13 @@ $$;
 
 
 --
+-- Name: FUNCTION account_hierarchy_change(account_hierarchy public.account_hierarchy, range daterange); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.account_hierarchy_change(account_hierarchy public.account_hierarchy, range daterange) IS 'Calculates the total amount of postings for a given account hierarchy within a specified date range';
+
+
+--
 -- Name: assertion; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -188,6 +223,13 @@ CREATE TABLE public.assertion (
 
 
 --
+-- Name: TABLE assertion; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.assertion IS 'Beancount balance directive';
+
+
+--
 -- Name: assertion_is_balanced(public.assertion); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -195,7 +237,7 @@ CREATE FUNCTION public.assertion_is_balanced(a public.assertion) RETURNS boolean
     LANGUAGE sql STABLE
     AS $$
 SELECT
-	is_balanced (a.amount, posting_balance (posting.*))
+	balance_contains_amount (a.amount, posting_balance (posting.*))
 FROM
 	posting
 WHERE
@@ -212,7 +254,42 @@ $$;
 -- Name: FUNCTION assertion_is_balanced(a public.assertion); Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON FUNCTION public.assertion_is_balanced(a public.assertion) IS '@nonNull';
+COMMENT ON FUNCTION public.assertion_is_balanced(a public.assertion) IS 'Checks if a balance directive (assertion) is balanced';
+
+
+--
+-- Name: balance_contains_amount(public.amount, public.amount[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.balance_contains_amount(amount public.amount, balances public.amount[]) RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+BEGIN
+	IF balances IS NULL OR array_length(balances, 1) IS NULL THEN
+		RETURN FALSE;
+
+END IF;
+
+FOR i IN 1..array_length(balances, 1)
+LOOP
+	IF balances[i].currency = amount.currency THEN
+		RETURN balances[i].number = amount.number;
+
+END IF;
+
+END LOOP;
+
+RETURN FALSE;
+
+END;
+$$;
+
+
+--
+-- Name: FUNCTION balance_contains_amount(amount public.amount, balances public.amount[]); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.balance_contains_amount(amount public.amount, balances public.amount[]) IS 'Given a single amount, assert that the same amount exists in the array of balances. Used to check balance assertions.';
 
 
 --
@@ -242,6 +319,13 @@ $$;
 
 
 --
+-- Name: FUNCTION convert_currency(base public.amount, quote public.amount); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.convert_currency(base public.amount, quote public.amount) IS 'Converts base currency to quote currency given the quote value';
+
+
+--
 -- Name: posting; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -258,6 +342,13 @@ CREATE TABLE public.posting (
     cost_label text,
     matching_lot_id integer
 );
+
+
+--
+-- Name: TABLE posting; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.posting IS 'Transaction posting';
 
 
 --
@@ -295,6 +386,13 @@ $$;
 
 
 --
+-- Name: FUNCTION cost_basis(postings public.posting[]); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.cost_basis(postings public.posting[]) IS 'Calculates the cost basis by matching lots';
+
+
+--
 -- Name: cost_basis_avg(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -326,6 +424,13 @@ $$;
 
 
 --
+-- Name: FUNCTION cost_basis_avg(postings public.posting[]); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.cost_basis_avg(postings public.posting[]) IS 'Calculates the average cost basis';
+
+
+--
 -- Name: cost_basis_fifo(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -337,6 +442,13 @@ $$;
 
 
 --
+-- Name: FUNCTION cost_basis_fifo(postings public.posting[]); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.cost_basis_fifo(postings public.posting[]) IS 'Calculates the cost basis by matching lots using FIFO';
+
+
+--
 -- Name: cost_basis_lifo(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -345,6 +457,13 @@ CREATE FUNCTION public.cost_basis_lifo(postings public.posting[]) RETURNS public
     AS $$
 SELECT cost_basis_lifo_fifo(postings, true)
 $$;
+
+
+--
+-- Name: FUNCTION cost_basis_lifo(postings public.posting[]); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.cost_basis_lifo(postings public.posting[]) IS 'Calculates the cost basis by matching lots using LIFO';
 
 
 --
@@ -402,6 +521,13 @@ $$;
 
 
 --
+-- Name: FUNCTION cost_basis_lifo_fifo(postings public.posting[], is_lifo boolean); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.cost_basis_lifo_fifo(postings public.posting[], is_lifo boolean) IS 'A generic function for calculating the cost basis using either FIFO or LIFO';
+
+
+--
 -- Name: inventory(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -426,10 +552,17 @@ $$;
 
 
 --
--- Name: is_balanced(public.amount[], public.amount[]); Type: FUNCTION; Schema: public; Owner: -
+-- Name: FUNCTION inventory(postings public.posting[]); Type: COMMENT; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.is_balanced(balances public.amount[], tolerances public.amount[]) RETURNS boolean
+COMMENT ON FUNCTION public.inventory(postings public.posting[]) IS 'Create an inventory (lot[]) for a list of postings';
+
+
+--
+-- Name: is_balance_in_tolerance(public.amount[], public.amount[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.is_balance_in_tolerance(balances public.amount[], tolerances public.amount[]) RETURNS boolean
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -451,45 +584,10 @@ $$;
 
 
 --
--- Name: FUNCTION is_balanced(balances public.amount[], tolerances public.amount[]); Type: COMMENT; Schema: public; Owner: -
+-- Name: FUNCTION is_balance_in_tolerance(balances public.amount[], tolerances public.amount[]); Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON FUNCTION public.is_balanced(balances public.amount[], tolerances public.amount[]) IS 'Given an array of balances and tolerances assert that there is only a single amount and that it''s value is within the tolerance.';
-
-
---
--- Name: is_balanced(public.amount, public.amount[]); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.is_balanced(amount public.amount, balances public.amount[]) RETURNS boolean
-    LANGUAGE plpgsql IMMUTABLE
-    AS $$
-BEGIN
-	IF balances IS NULL OR array_length(balances, 1) IS NULL THEN
-		RETURN FALSE;
-
-END IF;
-
-FOR i IN 1..array_length(balances, 1)
-LOOP
-	IF balances[i].currency = amount.currency THEN
-		RETURN balances[i].number = amount.number;
-
-END IF;
-
-END LOOP;
-
-RETURN FALSE;
-
-END;
-$$;
-
-
---
--- Name: FUNCTION is_balanced(amount public.amount, balances public.amount[]); Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON FUNCTION public.is_balanced(amount public.amount, balances public.amount[]) IS 'Given a single amount assert that the same amount exists in the array of balances. Used to check balance assertions.';
+COMMENT ON FUNCTION public.is_balance_in_tolerance(balances public.amount[], tolerances public.amount[]) IS 'Given an array of balances and tolerances assert that there is only a single amount and that it''s value is within the tolerance.';
 
 
 --
@@ -558,6 +656,13 @@ $$;
 
 
 --
+-- Name: FUNCTION market_price(convert_amount public.amount, into_currency text, for_date date); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.market_price(convert_amount public.amount, into_currency text, for_date date) IS 'Convert a amount into a currency for a given date';
+
+
+--
 -- Name: max(public.amount[], public.amount); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -599,6 +704,13 @@ $$;
 
 
 --
+-- Name: FUNCTION max(state public.amount[], current public.amount); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.max(state public.amount[], current public.amount) IS 'Aggregate function to find max balance of amounts. Used for calculating the max tolerance.';
+
+
+--
 -- Name: posting_balance(public.posting); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -621,44 +733,6 @@ $$;
 --
 
 COMMENT ON FUNCTION public.posting_balance(p public.posting) IS 'Calculate running balance for posting';
-
-
---
--- Name: sum(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.sum(postings public.posting[]) RETURNS public.amount[]
-    LANGUAGE plpgsql
-    AS $$
-DECLARE total_amount amount[];
-
-converted_amount amount;
-
-p posting;
-
-BEGIN
-	-- Loop through each posting to compute the total amount and max_tolerance
-	FOREACH p IN ARRAY postings LOOP
-		-- Convert currency if there's a price or cost
-		IF p.cost IS NOT NULL THEN
-			converted_amount := convert_currency (p.amount, p.cost);
-
-ELSIF p.price IS NOT NULL THEN
-	converted_amount := convert_currency (p.amount, p.price);
-
-ELSE
-	converted_amount := p.amount;
-
-END IF;
-
-total_amount := sum(total_amount, converted_amount);
-
-END LOOP;
-
-RETURN total_amount;
-
-END;
-$$;
 
 
 --
@@ -693,6 +767,13 @@ $$;
 
 
 --
+-- Name: FUNCTION sum(state public.amount[], current public.amount[]); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.sum(state public.amount[], current public.amount[]) IS 'Aggregate sum of balances (amount[])';
+
+
+--
 -- Name: sum(public.amount[], public.amount); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -700,113 +781,59 @@ CREATE FUNCTION public.sum(state public.amount[], current public.amount) RETURNS
     LANGUAGE plpgsql
     AS $$
 DECLARE
-	i int;
+    i int;
 BEGIN
-	IF CURRENT IS NULL THEN
-		RETURN state;
-	END IF;
-	FOR i IN 1..coalesce(array_length(state, 1), 0)
-	LOOP
-		IF state[i].currency = current.currency THEN
-			state[i].number := state[i].number + current.number;
-			RETURN state;
-		END IF;
-	END LOOP;
-	RETURN array_append(state, CURRENT);
+    IF CURRENT IS NULL THEN
+        RETURN state;
+    END IF;
+    FOR i IN 1..coalesce(array_length(state, 1), 0)
+    LOOP
+        IF state[i].currency = current.currency THEN
+            state[i].number := state[i].number + current.number;
+            RETURN state;
+        END IF;
+    END LOOP;
+    RETURN array_append(state, CURRENT);
 END;
 $$;
 
 
 --
--- Name: sum(public.lot[], public.posting); Type: FUNCTION; Schema: public; Owner: -
+-- Name: FUNCTION sum(state public.amount[], current public.amount); Type: COMMENT; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.sum(state public.lot[], current public.posting) RETURNS public.lot[]
+COMMENT ON FUNCTION public.sum(state public.amount[], current public.amount) IS 'Aggregate sum of amount';
+
+
+--
+-- Name: sum(public.amount[], public.posting); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.sum(state public.amount[], current public.posting) RETURNS public.amount[]
     LANGUAGE plpgsql
     AS $$
 DECLARE
-	-- Temporary variable to hold the lot constructed from the current posting.
-	new_lot lot;
-	i int = 0;
-BEGIN
-	-- Constructing a new lot type from current posting.
-	new_lot := (current.id,
-		current.amount,
-		current.cost,
-		current.cost_date,
-		current.cost_label,
-		current.matching_lot_id);
-	-- Check if the state is NULL (first call) and initialize if necessary.
-	IF array_length(state, 1) IS NULL THEN
-		RETURN array_append(state, new_lot);
-	END IF;
-	-- If there is a cost, append the new lot to the state array.
-	IF current.cost IS NOT NULL THEN
-		RETURN array_append(state, new_lot);
-	END IF;
-	-- Treat as an amount without cost, attempt to merge with existing lots.
-	FOR i IN 1..array_length(state, 1)
-	LOOP
-		IF (state[i].amount).currency = (current.amount).currency AND state[i].
-	COST IS NULL THEN
-			state[i].amount.number := (state[i].amount).number + (current.amount).number;
-			RETURN state;
-		END IF;
-	END LOOP;
-	RETURN array_append(state, new_lot);
-END;
-$$;
-
-
---
--- Name: tolerance(public.posting[]); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.tolerance(postings public.posting[]) RETURNS public.amount[]
-    LANGUAGE plpgsql
-    AS $$
-DECLARE max_tolerance amount[];
-
-temp_tolerance amount;
-
-p posting;
-
+	converted_amount amount;
 BEGIN
 	-- Loop through each posting to compute the total amount and max_tolerance
-	FOREACH p IN ARRAY postings LOOP
-		-- Convert currency if there's a price or cost
-		IF p.cost IS NOT NULL THEN
-			temp_tolerance := tolerance (p.amount, p.cost);
-
-ELSIF p.price IS NOT NULL THEN
-	temp_tolerance := tolerance (p.price);
-
-ELSE
-	temp_tolerance := tolerance (p.amount);
-
-END IF;
-
-IF max_tolerance IS NULL THEN
-	max_tolerance := ARRAY[temp_tolerance];
-
-ELSE
-	max_tolerance := max(max_tolerance, temp_tolerance);
-
-END IF;
-
-END LOOP;
-
-RETURN max_tolerance;
-
+	-- Convert currency if there's a price or cost
+	IF current.cost IS NOT NULL THEN
+		converted_amount := convert_currency (current.amount, current.cost);
+	ELSIF current.price IS NOT NULL THEN
+		converted_amount := convert_currency (current.amount, current.price);
+	ELSE
+		converted_amount := current.amount;
+	END IF;
+	RETURN sum(state, converted_amount);
 END;
 $$;
 
 
 --
--- Name: FUNCTION tolerance(postings public.posting[]); Type: COMMENT; Schema: public; Owner: -
+-- Name: FUNCTION sum(state public.amount[], current public.posting); Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON FUNCTION public.tolerance(postings public.posting[]) IS 'Calculate tolerance from a list of postings';
+COMMENT ON FUNCTION public.sum(state public.amount[], current public.posting) IS 'Aggregate sum of postings accounting for cost and price';
 
 
 --
@@ -827,11 +854,49 @@ BEGIN
 	WHERE
 		commodity.currency = base.currency;
 
-RETURN (tolerance,
+RETURN (coalesce(tolerance, 0),
 	base.currency)::amount;
 
 END;
 $$;
+
+
+--
+-- Name: FUNCTION tolerance(base public.amount); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.tolerance(base public.amount) IS 'Calculate tolerance for an amount';
+
+
+--
+-- Name: tolerance(public.amount[], public.posting); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.tolerance(state public.amount[], current public.posting) RETURNS public.amount[]
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	tolerance amount;
+BEGIN
+	-- Loop through each posting to compute the total amount and max_tolerance
+	-- Convert currency if there's a price or cost
+	IF current.cost IS NOT NULL THEN
+		tolerance := tolerance (current.amount, current.cost);
+	ELSIF current.price IS NOT NULL THEN
+		tolerance := tolerance (current.price);
+	ELSE
+		tolerance := tolerance (current.amount);
+	END IF;
+	RETURN max(state, tolerance);
+END;
+$$;
+
+
+--
+-- Name: FUNCTION tolerance(state public.amount[], current public.posting); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.tolerance(state public.amount[], current public.posting) IS 'Aggregate tolerance for a list postings';
 
 
 --
@@ -881,6 +946,13 @@ CREATE TABLE public.transaction (
 
 
 --
+-- Name: TABLE transaction; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.transaction IS 'Beancount transaction directive';
+
+
+--
 -- Name: transaction_balance(public.transaction); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -888,12 +960,19 @@ CREATE FUNCTION public.transaction_balance(t public.transaction) RETURNS public.
     LANGUAGE sql STABLE
     AS $$
 SELECT
-	sum(array_agg(posting.*))
+	sum(posting.*)
 FROM
 	posting
 WHERE
 	posting.transaction_id = t.id
 $$;
+
+
+--
+-- Name: FUNCTION transaction_balance(t public.transaction); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.transaction_balance(t public.transaction) IS 'Calculate balance of a transaction';
 
 
 --
@@ -904,12 +983,19 @@ CREATE FUNCTION public.transaction_is_balanced(t public.transaction) RETURNS boo
     LANGUAGE sql STABLE
     AS $$
 SELECT
-	is_balanced (sum(array_agg(posting.*)), tolerance (array_agg(posting.*)))
+	is_balance_in_tolerance (sum(posting.*), tolerance (posting.*))
 FROM
 	posting
 WHERE
 	posting.transaction_id = t.id
 $$;
+
+
+--
+-- Name: FUNCTION transaction_is_balanced(t public.transaction); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.transaction_is_balanced(t public.transaction) IS 'Calculate if a transaction is balanced';
 
 
 --
@@ -920,12 +1006,19 @@ CREATE FUNCTION public.transaction_tolerance(t public.transaction) RETURNS publi
     LANGUAGE sql STABLE
     AS $$
 SELECT
-	tolerance (array_agg(posting.*))
+	tolerance (posting.*)
 FROM
 	posting
 WHERE
 	posting.transaction_id = t.id
 $$;
+
+
+--
+-- Name: FUNCTION transaction_tolerance(t public.transaction); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.transaction_tolerance(t public.transaction) IS 'Calculate tolerance for a transaction';
 
 
 --
@@ -1016,7 +1109,18 @@ CREATE AGGREGATE public.sum(public.amount) (
 
 CREATE AGGREGATE public.sum(public.posting) (
     SFUNC = public.sum,
-    STYPE = public.lot[],
+    STYPE = public.amount[],
+    INITCOND = '{}'
+);
+
+
+--
+-- Name: tolerance(public.posting); Type: AGGREGATE; Schema: public; Owner: -
+--
+
+CREATE AGGREGATE public.tolerance(public.posting) (
+    SFUNC = public.tolerance,
+    STYPE = public.amount[],
     INITCOND = '{}'
 );
 
@@ -1064,6 +1168,13 @@ CREATE TABLE public.commodity (
 
 
 --
+-- Name: TABLE commodity; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.commodity IS 'Beancount commodity directive';
+
+
+--
 -- Name: commodity_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -1088,6 +1199,13 @@ CREATE TABLE public.document (
     data bytea NOT NULL,
     filename text NOT NULL
 );
+
+
+--
+-- Name: TABLE document; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.document IS 'Binary document data';
 
 
 --
@@ -1131,6 +1249,13 @@ CREATE TABLE public.price (
 
 
 --
+-- Name: TABLE price; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.price IS 'Beancount price directive';
+
+
+--
 -- Name: price_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -1158,6 +1283,13 @@ UNION ALL
     (price.amount).currency AS currency,
     ROW(((1)::numeric / (price.amount).number), price.currency)::public.amount AS amount
    FROM public.price;
+
+
+--
+-- Name: VIEW price_inverted; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON VIEW public.price_inverted IS 'price directive with inverted prices';
 
 
 --
