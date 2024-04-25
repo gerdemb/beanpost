@@ -221,6 +221,9 @@ def import_commodities(cursor, entries):
 
 
 def import_documents(cursor, entries):
+    if document_path is None:
+        return
+
     def read_data(filename):
         """
         Reads the content of the file specified by `filename` in binary mode.
@@ -300,7 +303,10 @@ def main():
         args.filename, log_timings=logging.info, log_errors=sys.stderr
     )
 
-    document_path = Path(args.filename).parent / options_map["documents"][0]
+    if len(options_map["documents"]) > 0:
+        document_path = Path(args.filename).parent / options_map["documents"][0]
+    else:
+        document_path = None
 
     dsn = parse_dsn(args.database)
     connection = dbapi.connect(**dsn)
