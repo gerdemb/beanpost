@@ -1,0 +1,49 @@
+2015-04-01 open Assets:Invest 
+2015-04-01 open Assets:Account 
+
+2015-04-01 * "" "Buy some shares of Hooli in April"
+  Assets:Invest 25 HOOL {2015-04-01, 23.00 USD, "first-lot"}
+  Assets:Account -575.00 USD
+
+2015-05-01 * "" "Buy some more shares of Hooli in May"
+  Assets:Invest 35 HOOL {2015-05-01, 27.00 USD}
+  Assets:Account -945.00 USD
+
+2015-05-15 * "" "Sell some shares 5/15"
+  Assets:Account 575.00 USD
+  Assets:Invest -25 HOOL {2015-04-01, 23.00 USD, "first-lot"}
+
+2015-05-16 * "" "Sell some shares 5/16"
+  Assets:Account 540.00 USD
+  Assets:Invest -20 HOOL {2015-05-01, 27.00 USD}
+
+2015-06-01 * "" "Buy some more shares of Hooli in June"
+  Assets:Invest 10 HOOL {2015-06-01, 30.00 EUR}
+  Assets:Account -300.00 EUR
+
+2016-07-28 * "" "Buy some shares of retirement fund in July"
+  Assets:Invest 45.0045 VBMPX {2016-07-28, 11.11 USD}
+  Assets:Account -500.00 USD
+
+2016-10-12 * "" "Buy some shares of retirement fund in Oct"
+  Assets:Invest 54.5951 VBMPX {2016-10-12, 10.99 USD}
+  Assets:Account -600.00 USD
+2017-01-01 balance Assets:Account -1505.00 USD
+
+2017-01-01 balance Assets:Invest 25 HOOL
+
+2017-01-01 balance Assets:Invest 99.5996 VBMPX
+
+2023-01-01 price USD 110 JPY
+
+2023-01-01 price EUR 120 JPY
+
+2023-01-01 price HOOL 30.00 USD
+
+2023-01-01 price VBMPX 10.00 USD
+
+2000-01-01 commodity USD
+  decimal_places: 2
+2015-04-01 commodity HOOL
+  decimal_places: 0
+2020-01-01 custom "fava-option" "insert-entry" ".*"
