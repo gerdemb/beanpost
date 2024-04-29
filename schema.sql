@@ -243,26 +243,12 @@ COMMENT ON FUNCTION public.assertion_is_balanced(a public.assertion) IS 'Checks 
 --
 
 CREATE FUNCTION public.balance_contains_amount(amount public.amount, balances public.amount[]) RETURNS boolean
-    LANGUAGE plpgsql IMMUTABLE
+    LANGUAGE sql IMMUTABLE
     AS $$
-BEGIN
-	IF balances IS NULL OR array_length(balances, 1) IS NULL THEN
-		RETURN FALSE;
-
-END IF;
-
-FOR i IN 1..array_length(balances, 1)
-LOOP
-	IF balances[i].currency = amount.currency THEN
-		RETURN balances[i].number = amount.number;
-
-END IF;
-
-END LOOP;
-
-RETURN FALSE;
-
-END;
+    SELECT EXISTS (
+        SELECT 1 FROM unnest(balances) as bal
+        WHERE bal.currency = amount.currency AND bal.number = amount.number
+    )
 $$;
 
 
