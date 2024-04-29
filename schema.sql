@@ -752,23 +752,17 @@ COMMENT ON FUNCTION public.sum(state public.amount[], current public.posting) IS
 --
 
 CREATE FUNCTION public.tolerance(base public.amount) RETURNS public.amount
-    LANGUAGE plpgsql
+    LANGUAGE sql
     AS $$
-DECLARE tolerance decimal;
-
-BEGIN
-	SELECT
-		power(10,
-			- decimal_places) INTO tolerance
-	FROM
-		commodity
-	WHERE
-		commodity.currency = base.currency;
-
-RETURN (coalesce(tolerance, 0),
-	base.currency)::amount;
-
-END;
+    SELECT (
+        COALESCE(
+            (SELECT power(10, -c.decimal_places) 
+             FROM commodity c
+             WHERE c.currency = base.currency),
+            0
+        ), 
+        base.currency
+    )::amount
 $$;
 
 
