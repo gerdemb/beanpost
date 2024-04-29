@@ -264,24 +264,16 @@ COMMENT ON FUNCTION public.balance_contains_amount(amount public.amount, balance
 --
 
 CREATE FUNCTION public.convert_currency(base public.amount, quote public.amount) RETURNS public.amount
-    LANGUAGE plpgsql
+    LANGUAGE sql
     AS $$
-DECLARE converted_amount public.amount;
-
-BEGIN
-	IF quote IS NULL THEN
-		RETURN base;
-
-END IF;
-
--- Convert the currency
-converted_amount.number := base.number * quote.number;
-
-converted_amount.currency := quote.currency;
-
-RETURN converted_amount;
-
-END;
+	SELECT
+		(
+			CASE WHEN quote IS NULL THEN
+				base
+			ELSE
+				(base.number * quote.number,
+					quote.currency)::amount
+			END)
 $$;
 
 
