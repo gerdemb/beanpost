@@ -107,12 +107,9 @@ COMMENT ON FUNCTION public.account_change(account public.account, range daterang
 --
 
 CREATE FUNCTION public.depth(a text) RETURNS integer
-    LANGUAGE plpgsql IMMUTABLE
+    LANGUAGE sql IMMUTABLE
     AS $$
-BEGIN
-	RETURN (length(a) - length(replace(a, ':', '')));
-
-END;
+    SELECT length(a) - length(replace(a, ':', ''))
 $$;
 
 
