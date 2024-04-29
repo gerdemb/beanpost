@@ -522,23 +522,13 @@ COMMENT ON FUNCTION public.inventory(postings public.posting[]) IS 'Create an in
 --
 
 CREATE FUNCTION public.is_balance_in_tolerance(balances public.amount[], tolerances public.amount[]) RETURNS boolean
-    LANGUAGE plpgsql
+    LANGUAGE sql STABLE
     AS $$
-BEGIN
-	IF array_length(balances,
-		1) != 1 OR array_length(tolerances, 1) != 1 THEN
-		RETURN FALSE;
-
-END IF;
-
-IF balances[1].currency != tolerances[1].currency THEN
-	RETURN FALSE;
-
-END IF;
-
-RETURN abs(balances[1].number) < tolerances[1].number;
-
-END;
+	SELECT
+		array_length(balances, 1) = 1
+		AND array_length(tolerances, 1) = 1
+		AND balances[1].currency = tolerances[1].currency
+		AND abs(balances[1].number) < tolerances[1].number
 $$;
 
 
