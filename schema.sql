@@ -264,7 +264,7 @@ COMMENT ON FUNCTION public.balance_contains_amount(amount public.amount, balance
 --
 
 CREATE FUNCTION public.convert_currency(base public.amount, quote public.amount) RETURNS public.amount
-    LANGUAGE sql
+    LANGUAGE sql IMMUTABLE
     AS $$
 	SELECT
 		(
@@ -315,7 +315,7 @@ COMMENT ON TABLE public.posting IS 'Transaction posting';
 --
 
 CREATE FUNCTION public.cost_basis(postings public.posting[]) RETURNS public.lot[]
-    LANGUAGE sql
+    LANGUAGE sql STABLE
     AS $$
 	WITH augmentation AS (
 		SELECT
@@ -356,7 +356,7 @@ COMMENT ON FUNCTION public.cost_basis(postings public.posting[]) IS 'Calculates 
 --
 
 CREATE FUNCTION public.cost_basis_avg(postings public.posting[]) RETURNS public.lot[]
-    LANGUAGE sql
+    LANGUAGE sql STABLE
     AS $$
 	WITH summed AS (
 		-- Sum the total cost and total amount
@@ -394,7 +394,7 @@ COMMENT ON FUNCTION public.cost_basis_avg(postings public.posting[]) IS 'Calcula
 --
 
 CREATE FUNCTION public.cost_basis_fifo(postings public.posting[]) RETURNS public.lot[]
-    LANGUAGE sql
+    LANGUAGE sql STABLE
     AS $$
 SELECT cost_basis_lifo_fifo(postings, FALSE)
 $$;
@@ -412,7 +412,7 @@ COMMENT ON FUNCTION public.cost_basis_fifo(postings public.posting[]) IS 'Calcul
 --
 
 CREATE FUNCTION public.cost_basis_lifo(postings public.posting[]) RETURNS public.lot[]
-    LANGUAGE sql
+    LANGUAGE sql STABLE
     AS $$
 SELECT cost_basis_lifo_fifo(postings, true)
 $$;
@@ -430,7 +430,7 @@ COMMENT ON FUNCTION public.cost_basis_lifo(postings public.posting[]) IS 'Calcul
 --
 
 CREATE FUNCTION public.cost_basis_lifo_fifo(postings public.posting[], is_lifo boolean) RETURNS public.lot[]
-    LANGUAGE sql
+    LANGUAGE sql IMMUTABLE
     AS $$
 -- Determine the correct ordering based on is_lifo parameter
 WITH reduction AS (
@@ -491,7 +491,7 @@ COMMENT ON FUNCTION public.cost_basis_lifo_fifo(postings public.posting[], is_li
 --
 
 CREATE FUNCTION public.inventory(postings public.posting[]) RETURNS public.lot[]
-    LANGUAGE sql
+    LANGUAGE sql IMMUTABLE
     AS $$
 SELECT
     ARRAY_AGG(
@@ -522,7 +522,7 @@ COMMENT ON FUNCTION public.inventory(postings public.posting[]) IS 'Create an in
 --
 
 CREATE FUNCTION public.is_balance_in_tolerance(balances public.amount[], tolerances public.amount[]) RETURNS boolean
-    LANGUAGE sql STABLE
+    LANGUAGE sql IMMUTABLE
     AS $$
 	SELECT
 		array_length(balances, 1) = 1
@@ -592,7 +592,7 @@ COMMENT ON FUNCTION public.market_price(convert_amount public.amount, into_curre
 --
 
 CREATE FUNCTION public.max(state public.amount[], current public.amount) RETURNS public.amount[]
-    LANGUAGE sql STABLE
+    LANGUAGE sql IMMUTABLE
     AS $$
 	SELECT
 		ARRAY (
@@ -653,7 +653,7 @@ COMMENT ON FUNCTION public.posting_balance(p public.posting) IS 'Calculate runni
 --
 
 CREATE FUNCTION public.sum(state public.amount[], current public.amount[]) RETURNS public.amount[]
-    LANGUAGE sql
+    LANGUAGE sql IMMUTABLE
     AS $$
 	SELECT
 		ARRAY (
@@ -691,7 +691,7 @@ COMMENT ON FUNCTION public.sum(state public.amount[], current public.amount[]) I
 --
 
 CREATE FUNCTION public.sum(state public.amount[], current public.amount) RETURNS public.amount[]
-    LANGUAGE sql
+    LANGUAGE sql IMMUTABLE
     AS $$
 	SELECT
 		ARRAY (
@@ -727,7 +727,7 @@ COMMENT ON FUNCTION public.sum(state public.amount[], current public.amount) IS 
 --
 
 CREATE FUNCTION public.sum(state public.amount[], current public.posting) RETURNS public.amount[]
-    LANGUAGE sql
+    LANGUAGE sql STABLE
     AS $$
     SELECT public.sum(
         state,
@@ -752,7 +752,7 @@ COMMENT ON FUNCTION public.sum(state public.amount[], current public.posting) IS
 --
 
 CREATE FUNCTION public.tolerance(base public.amount) RETURNS public.amount
-    LANGUAGE sql
+    LANGUAGE sql STABLE
     AS $$
     SELECT (
         COALESCE(
@@ -778,7 +778,7 @@ COMMENT ON FUNCTION public.tolerance(base public.amount) IS 'Calculate tolerance
 --
 
 CREATE FUNCTION public.tolerance(state public.amount[], current public.posting) RETURNS public.amount[]
-    LANGUAGE sql
+    LANGUAGE sql STABLE
     AS $$
     SELECT public.max(
         state,
@@ -803,7 +803,7 @@ COMMENT ON FUNCTION public.tolerance(state public.amount[], current public.posti
 --
 
 CREATE FUNCTION public.tolerance(base public.amount, quote public.amount) RETURNS public.amount
-    LANGUAGE sql
+    LANGUAGE sql STABLE
     AS $$
     SELECT ((tolerance(base)).number * quote.number, quote.currency)::amount
 $$;
