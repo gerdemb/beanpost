@@ -765,7 +765,7 @@ DECLARE tolerance decimal;
 BEGIN
 	SELECT
 		power(10,
-			- decimal_places) / 2 INTO tolerance
+			- decimal_places) INTO tolerance
 	FROM
 		commodity
 	WHERE
@@ -821,23 +821,9 @@ COMMENT ON FUNCTION public.tolerance(state public.amount[], current public.posti
 --
 
 CREATE FUNCTION public.tolerance(base public.amount, quote public.amount) RETURNS public.amount
-    LANGUAGE plpgsql
+    LANGUAGE sql
     AS $$
-DECLARE tolerance decimal;
-
-BEGIN
-	SELECT
-		power(10,
-			- decimal_places) INTO tolerance
-	FROM
-		commodity
-	WHERE
-		commodity.currency = base.currency;
-
-RETURN (tolerance * quote.number,
-	quote.currency)::amount;
-
-END;
+    SELECT ((tolerance(base)).number * quote.number, quote.currency)::amount
 $$;
 
 

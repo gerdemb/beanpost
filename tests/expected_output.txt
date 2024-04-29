@@ -60,8 +60,8 @@
   6 | *    |       | Sell some shares 5/15                      | {}   | {}    | {"(23.00,USD)"}       | {"(0.00,USD)"}      | t
   7 | *    |       | Sell some shares 5/16                      | {}   | {}    | {"(27.00,USD)"}       | {"(0.00,USD)"}      | t
   8 | *    |       | Buy some more shares of Hooli in June      | {}   | {}    | {"(30.00,EUR)"}       | {"(0.00,EUR)"}      | t
-  9 | *    |       | Buy some shares of retirement fund in July | {}   | {}    | {"(0.005,USD)"}       | {"(-0.000005,USD)"} | t
- 10 | *    |       | Buy some shares of retirement fund in Oct  | {}   | {}    | {"(0.005,USD)"}       | {"(0.000149,USD)"}  | t
+  9 | *    |       | Buy some shares of retirement fund in July | {}   | {}    | {"(0.01,USD)"}        | {"(-0.000005,USD)"} | t
+ 10 | *    |       | Buy some shares of retirement fund in Oct  | {}   | {}    | {"(0.01,USD)"}        | {"(0.000149,USD)"}  | t
 (7 rows)
 
                                                                                                                                                                                         none                                                                                                                                                                                         |                                                                                                                                 strict                                                                                                                                  |                                                       avg                                                        |                                                                                                      fifo                                                                                                       |                                                                                   lifo                                                                                   
