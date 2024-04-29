@@ -566,27 +566,17 @@ COMMENT ON FUNCTION public.market_price(balance public.amount[], into_currency t
 --
 
 CREATE FUNCTION public.market_price(convert_amount public.amount, into_currency text, for_date date) RETURNS public.amount
-    LANGUAGE plpgsql
+    LANGUAGE sql STABLE
     AS $$
-DECLARE quote amount;
-
-BEGIN
 	SELECT
-		(amount).number,
-		(amount).currency INTO quote
-	FROM
-		price_inverted
-	WHERE
-		currency = (convert_amount).currency
-		AND (amount).currency = into_currency
-		AND date <= for_date
-	ORDER BY
-		date DESC
-	LIMIT 1;
-
-RETURN convert_currency (convert_amount, quote);
-
-END;
+		convert_currency (convert_amount, (
+				SELECT
+					amount AS quote
+				FROM price_inverted
+				WHERE
+					currency = convert_amount.currency
+					AND (amount).currency = into_currency
+				AND date <= for_date ORDER BY date DESC LIMIT 1))
 $$;
 
 
