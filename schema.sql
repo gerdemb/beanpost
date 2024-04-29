@@ -653,29 +653,29 @@ COMMENT ON FUNCTION public.posting_balance(p public.posting) IS 'Calculate runni
 --
 
 CREATE FUNCTION public.sum(state public.amount[], current public.amount[]) RETURNS public.amount[]
-    LANGUAGE plpgsql
+    LANGUAGE sql
     AS $$
-DECLARE new_state amount[] := state;
-
-i int := 0;
-
-BEGIN
-	IF array_length(CURRENT,
-		1) IS NULL THEN
-		RETURN new_state;
-
-END IF;
-
-FOR i IN 1..array_length(CURRENT, 1)
-LOOP
-	-- Assuming you want to append each element of current to new_state
-	new_state := sum(new_state, CURRENT[i]);
-
-END LOOP;
-
-RETURN new_state;
-
-END;
+	SELECT
+		ARRAY (
+			SELECT
+				(sum(combined.number),
+					combined.currency)::public.amount
+			FROM (
+				SELECT
+					number,
+					currency
+				FROM
+					unnest(state)
+				UNION ALL
+				SELECT
+					number,
+					currency
+				FROM
+					unnest(CURRENT)) AS combined
+			GROUP BY
+				currency
+			ORDER BY
+				currency)
 $$;
 
 
