@@ -778,23 +778,27 @@ COMMENT ON FUNCTION public.sum(state public.amount[], current public.amount[]) I
 --
 
 CREATE FUNCTION public.sum(state public.amount[], current public.amount) RETURNS public.amount[]
-    LANGUAGE plpgsql
+    LANGUAGE sql
     AS $$
-DECLARE
-    i int;
-BEGIN
-    IF CURRENT IS NULL THEN
-        RETURN state;
-    END IF;
-    FOR i IN 1..coalesce(array_length(state, 1), 0)
-    LOOP
-        IF state[i].currency = current.currency THEN
-            state[i].number := state[i].number + current.number;
-            RETURN state;
-        END IF;
-    END LOOP;
-    RETURN array_append(state, CURRENT);
-END;
+	SELECT
+		ARRAY (
+			SELECT
+				(sum(combined.number),
+					combined.currency)::public.amount
+			FROM (
+				SELECT
+					number,
+					currency
+				FROM
+					unnest(state)
+				UNION ALL
+				SELECT
+					current.number,
+					current.currency) AS combined
+			GROUP BY
+				currency
+			ORDER BY
+				currency)
 $$;
 
 

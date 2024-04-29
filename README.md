@@ -167,6 +167,7 @@ Although beanpost is fairly comprehensive, some features are currently missing:
   3.  Check that inventory reductions have the same currency as the augmentation (lot) they are reducing from
   4.  Check that inventory reductions don't reduce lot amounts below zero
   5.  For strict cost-basis, all reductions should have matching augmentation lots
+  6.  Check that date of inventory reduction is after date of augmentation
 - _Plugins_
 - _Importing statements_: This might be out of scope for this project. Since the data is stored in a PostgreSQL database, any client that can insert data into the database could be written in any language.
 
