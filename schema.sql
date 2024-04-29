@@ -790,22 +790,16 @@ COMMENT ON FUNCTION public.tolerance(base public.amount) IS 'Calculate tolerance
 --
 
 CREATE FUNCTION public.tolerance(state public.amount[], current public.posting) RETURNS public.amount[]
-    LANGUAGE plpgsql
+    LANGUAGE sql
     AS $$
-DECLARE
-	tolerance amount;
-BEGIN
-	-- Loop through each posting to compute the total amount and max_tolerance
-	-- Convert currency if there's a price or cost
-	IF current.cost IS NOT NULL THEN
-		tolerance := tolerance (current.amount, current.cost);
-	ELSIF current.price IS NOT NULL THEN
-		tolerance := tolerance (current.price);
-	ELSE
-		tolerance := tolerance (current.amount);
-	END IF;
-	RETURN max(state, tolerance);
-END;
+    SELECT public.max(
+        state,
+        CASE
+            WHEN current.cost IS NOT NULL THEN public.tolerance(current.amount, current.cost)
+            WHEN current.price IS NOT NULL THEN public.tolerance(current.price)
+            ELSE public.tolerance(current.amount)
+        END
+    )
 $$;
 
 
