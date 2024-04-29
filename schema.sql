@@ -592,39 +592,27 @@ COMMENT ON FUNCTION public.market_price(convert_amount public.amount, into_curre
 --
 
 CREATE FUNCTION public.max(state public.amount[], current public.amount) RETURNS public.amount[]
-    LANGUAGE plpgsql
+    LANGUAGE sql STABLE
     AS $$
-DECLARE found boolean = FALSE;
-
-i int = 0;
-
-BEGIN
-	IF state IS NULL OR array_length(state, 1) IS NULL THEN
-		RETURN ARRAY[CURRENT];
-
-END IF;
-
-FOR i IN 1..array_length(state, 1)
-LOOP
-	IF state[i].currency = current.currency THEN
-		state[i].number := greatest (state[i].number, current.number);
-
-found := TRUE;
-
-EXIT;
-
-END IF;
-
-END LOOP;
-
-IF NOT found THEN
-	state := array_append(state, CURRENT);
-
-END IF;
-
-RETURN state;
-
-END;
+	SELECT
+		ARRAY (
+			SELECT
+				(max(combined.number),
+					combined.currency)::public.amount
+			FROM (
+				SELECT
+					number,
+					currency
+				FROM
+					unnest(state)
+				UNION ALL
+				SELECT
+					current.number,
+					current.currency) AS combined
+			GROUP BY
+				currency
+			ORDER BY
+				currency)
 $$;
 
 
