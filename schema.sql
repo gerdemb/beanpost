@@ -544,27 +544,13 @@ COMMENT ON FUNCTION public.is_balance_in_tolerance(balances public.amount[], tol
 --
 
 CREATE FUNCTION public.market_price(balance public.amount[], into_currency text, for_date date) RETURNS public.amount[]
-    LANGUAGE plpgsql
+    LANGUAGE sql STABLE
     AS $$
-DECLARE total amount[];
-
-i int = 0;
-
-BEGIN
-	IF balance IS NULL OR array_length(balance, 1) IS NULL THEN
-		RETURN NULL;
-
-END IF;
-
-FOR i IN 1..array_length(balance, 1)
-LOOP
-	total := sum(total, market_price (balance[i], into_currency, for_date));
-
-END LOOP;
-
-RETURN total;
-
-END;
+	SELECT
+		sum(market_converted)
+	FROM
+		unnest(balance) AS bal,
+	LATERAL market_price (bal, into_currency, for_date) AS market_converted
 $$;
 
 
