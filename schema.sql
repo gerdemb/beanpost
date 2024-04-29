@@ -727,22 +727,16 @@ COMMENT ON FUNCTION public.sum(state public.amount[], current public.amount) IS 
 --
 
 CREATE FUNCTION public.sum(state public.amount[], current public.posting) RETURNS public.amount[]
-    LANGUAGE plpgsql
+    LANGUAGE sql
     AS $$
-DECLARE
-	converted_amount amount;
-BEGIN
-	-- Loop through each posting to compute the total amount and max_tolerance
-	-- Convert currency if there's a price or cost
-	IF current.cost IS NOT NULL THEN
-		converted_amount := convert_currency (current.amount, current.cost);
-	ELSIF current.price IS NOT NULL THEN
-		converted_amount := convert_currency (current.amount, current.price);
-	ELSE
-		converted_amount := current.amount;
-	END IF;
-	RETURN sum(state, converted_amount);
-END;
+    SELECT public.sum(
+        state,
+        CASE
+            WHEN current.cost IS NOT NULL THEN convert_currency(current.amount, current.cost)
+            WHEN current.price IS NOT NULL THEN convert_currency(current.amount, current.price)
+            ELSE current.amount
+        END
+    )
 $$;
 
 
