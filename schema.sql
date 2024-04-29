@@ -125,25 +125,9 @@ COMMENT ON FUNCTION public.depth(a text) IS 'Find depth of an account name by co
 --
 
 CREATE FUNCTION public.reduce_depth(s text) RETURNS text
-    LANGUAGE plpgsql IMMUTABLE
+    LANGUAGE sql IMMUTABLE
     AS $$
-
-DECLARE
-
-    parts text[];
-
-    trim text[];
-
-BEGIN
-
-    parts := string_to_array(s, ':'); -- Split the input string by ':'
-
-    trim := trim_array(parts, 1);
-
-    RETURN array_to_string(trim,':');
-
-END;
-
+    SELECT array_to_string(trim_array(string_to_array(s, ':'), 1),':')
 $$;
 
 
